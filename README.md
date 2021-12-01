@@ -3,7 +3,7 @@
 
 ## What is it?
 
-Pulls latest dxsummit spots. Displays them in a compact interface. If you have an instance of `rigctld` running, when you click on a spot your radio will automatically tune to the spotted frequency and change modes to match the spot.   Filter output to band and or mode.
+Pulls latest dxsummit spots. Displays them in a compact interface. If you have an instance of `rigctld` running, when you click on a spot your radio will automatically tune to the spotted frequency.   Filter output to band and or mode.
 
 ![screenshot](pic/screen.png)
 
