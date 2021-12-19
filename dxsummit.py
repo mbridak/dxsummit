@@ -3,7 +3,8 @@
 import logging
 logging.basicConfig(level=logging.WARNING)
 
-import requests, sys, os, socket
+import xmlrpc.client
+import requests, sys, os
 from json import loads
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtCore import QDir
@@ -28,8 +29,8 @@ class MainWindow(QtWidgets.QMainWindow):
     """http://www.dxsummit.fi/api/v1/spots?include=14MHz&include_modes=CW,PHONE&limit_time=true&refresh=1636741291778"""
     dxsummiturl="http://www.dxsummit.fi/api/v1/spots"
     spotsorteddic={}
-    rigctld_addr = "127.0.0.1"
-    rigctld_port = 4532
+    rigctl_addr = "localhost"
+    rigctl_port = 12345
     bw = {}
     lastclicked = ""
 
@@ -39,10 +40,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.listWidget.clicked.connect(self.spotclicked)
         self.comboBox_band.currentTextChanged.connect(self.getspots)
         self.comboBox_mode.currentTextChanged.connect(self.getspots)
-        self.bw['LSB'] = '2400'
-        self.bw['USB'] = '2400'
-        self.bw['FM'] = '15000'
-        self.bw['CW'] = '200'
+        self.server = xmlrpc.client.ServerProxy(f"http://{self.rigctl_addr}:{self.rigctl_port}")
+
 
     def relpath(self, filename):
         try:
@@ -93,32 +92,27 @@ class MainWindow(QtWidgets.QMainWindow):
         If rigctld is running on this PC, tell it to tune to the spot freq.
         Otherwise die gracefully.
         """
-
-        item = self.listWidget.currentItem()
-        self.lastclicked = item.text()
-        line = item.text().split()
-        logging.debug(line)
-        freq = line[-1:][0].split(".")
-        mode = None
-        combfreq = freq[0]+freq[1].ljust(3,'0')
-        radiosocket = socket.socket()
-        radiosocket.settimeout(0.1)
-        radiosocket.connect((self.rigctld_addr, self.rigctld_port))
-        command = 'F'+combfreq+'\n'
-        radiosocket.send(command.encode('ascii'))
-        if self.comboBox_mode.currentText() != "All":
-            mode = self.comboBox_mode.currentText()
-        if mode == 'PHONE':
-            if int(combfreq) > 10000000:
-                mode = 'USB'
-            else:
-                mode = 'LSB'
-        if mode == None or mode == 'DIGI':
-            return
-        command = 'M '+mode+ ' ' + self.bw[mode] + '\n'
-        radiosocket.send(command.encode('ascii'))
-        radiosocket.shutdown(socket.SHUT_RDWR)
-        radiosocket.close()
+        try:
+            item = self.listWidget.currentItem()
+            self.lastclicked = item.text()
+            line = item.text().split()
+            logging.debug(line)
+            freq = line[-1:][0].split(".")
+            mode = None
+            combfreq = freq[0]+freq[1].ljust(3,'0')
+            self.server.rig.set_frequency(float(combfreq))
+            if self.comboBox_mode.currentText() != "All":
+                mode = self.comboBox_mode.currentText()
+            if mode == 'PHONE':
+                if int(combfreq) > 10000000:
+                    mode = 'USB'
+                else:
+                    mode = 'LSB'
+            if mode == None or mode == 'DIGI':
+                return
+            self.server.rig.set_mode(mode)
+        except Exception as e:
+            logging.warning(f"{e}")
 
     def getband(self, freq):
         """
